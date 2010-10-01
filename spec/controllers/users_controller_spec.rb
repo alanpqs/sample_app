@@ -13,6 +13,7 @@ describe UsersController do
       end  
     end
     
+    
     describe "for signed-in users" do
       
       before(:each) do
@@ -40,6 +41,16 @@ describe UsersController do
         get :index
         @users[0..2].each do |user|
           response.should have_selector("li", :content => user.name)
+        end
+      end
+      
+      it "should restrict delete button to admins" do
+        get :index
+        @users[0..2].each do |user|
+          unless @user.admin?
+          response.should_not have_selector("a", :href => "/users/#{user.id}",
+                                            :content => "delete")
+          end
         end
       end
       
@@ -97,9 +108,35 @@ describe UsersController do
       get :new
       response.should have_selector("title", :content => "Sign Up")
     end
+    
+    describe "denial of 'new' if signed in" do
+      
+      before (:each) do
+        @user = Factory(:user)
+        test_sign_in(@user)
+      end
+      
+      it "should return to root path if signed in" do
+        get :new
+        response.should redirect_to(root_path)
+      end  
+    end
   end
 
   describe "POST 'create'" do
+    
+    describe "denial of 'create' if signed in" do
+      
+      before (:each) do
+        @user = Factory(:user)
+        test_sign_in(@user)
+      end
+      
+      it "should return to root path if signed in" do
+        get :create
+        response.should redirect_to(root_path)
+      end  
+    end
     
     describe "failure" do
       
@@ -299,9 +336,20 @@ describe UsersController do
         test_sign_in(admin)
       end
       
+      it "should not destroy your own account" do
+        lambda do
+          @admin = User.find_by_email("admin@example.com")
+          if @user == @admin
+            delete :destroy, :id => @user
+          end  
+        end.should_not change(User, :count)    
+      end
+      
       it "should destroy the user" do
         lambda do
-          delete :destroy, :id => @user
+          if @user != @admin
+            delete :destroy, :id => @user 
+          end
         end.should change(User, :count).by(-1)
       end
       
